@@ -1,0 +1,45 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: batch-s3-copy
+  AWS_ACCOUNT_ID: "420795649885"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::420795649885:role/GitHubActionsECRPushRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        run: |
+          IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}
+          TAG=${GITHUB_SHA}
+
+          docker build -t ${IMAGE_URI}:${TAG} .
+          docker push ${IMAGE_URI}:${TAG}
+
+          # Optional: also push a stable tag for convenience
+          docker tag ${IMAGE_URI}:${TAG} ${IMAGE_URI}:prod
+          docker push ${IMAGE_URI}:prod
+
+          echo "Pushed ${IMAGE_URI}:${TAG} and ${IMAGE_URI}:prod"
